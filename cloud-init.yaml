@@ -1,0 +1,38 @@
+#cloud-config
+package_upgrade: true
+packages:
+  - nginx
+  - node-express
+  - python3
+write_files:
+  - owner: www-data:www-data
+    path: /etc/nginx/sites-available/default
+    content: |
+      server {
+        listen 80 default_server;
+        server_name _;
+        location / {
+          proxy_pass http://localhost:3000;
+          proxy_http_version 1.1;
+          proxy_set_header Upgrade $http_upgrade;
+          proxy_set_header Connection keep-alive;
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_cache_bypass $http_upgrade;
+        }
+      }
+  - owner: master:master
+    path: /home/master/myapp/index.js
+    content: |
+      var express = require('express')
+      var app = express()
+      var os = require('os');
+      app.get('/', function (req, res) {
+        res.send('Hello ' + req.headers['x-real-ip'] + ' from host ' + os.hostname() + '!')
+      })
+      app.listen(3000, function () {
+        console.log('Hello world app listening on port 3000!')
+      })  
+runcmd:
+  - nginx -s reload
+  - nodejs /home/master/myapp/index.js
